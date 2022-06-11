@@ -1,10 +1,22 @@
 const express = require('express');
+const mongoose = require('mongoose');
+
+const UserSchema = require('./UserSchema');
 
 const app = express();
 
 // Middleware -> After request before api call 
 app.use(express.json());
 app.use(express.urlencoded({extended: true}));
+
+mongoose.connect('mongodb://localhost:27017/backendjs', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}).then(res => {
+    console.log('Connected to db successfully');
+}).catch(err => {
+    console.log('Failed to connect', err);
+})
 
 app.get('/', (req, res) => {
     res.send('Welcome to our app');
@@ -105,6 +117,7 @@ app.put('/users', (req, res) => {
     res.send("User Added successfully");
 })
 
+// Deletes an obj from the db
 app.delete('/users', (req, res) => {
 
     const { userId } = req.body;
@@ -112,6 +125,21 @@ app.delete('/users', (req, res) => {
     users = users.filter(user => user.userId !== userId);
 
     res.send("User Deleted Successfully");
+})
+
+app.post('/register', async (req, res) => {
+    const { name, username, password, phone } = req.body;
+
+    let user = new UserSchema({
+        name,
+        username,
+        password,
+        phone
+    })
+
+    const userDb = await user.save(); // Create Operation
+
+    res.send(userDb);
 })
 
 app.listen(3000, () => {
@@ -136,3 +164,13 @@ app.listen(3000, () => {
 // }
 
 // We prefer to not send data in get api in req body
+
+// /login
+// /register 
+// /logout 
+
+// /auth/login 
+
+// orm - Object-Relational Mapper - Helps us interact with our database from code
+
+// Promise -> Processing, resolved, rejected 
