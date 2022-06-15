@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const validator = require('validator');
+const bcrypt = require('bcrypt');
 
 const UserSchema = require('./UserSchema');
 
@@ -182,7 +183,16 @@ app.post('/register', async (req, res) => {
 
     let userExists;
     // Check if user already exists
-    userExists = await UserSchema.findOne({email});
+    try {
+        userExists = await UserSchema.findOne({email});
+    }
+    catch(err) {
+        return res.send({
+            status: 400,
+            message: "Internal Server Error. Please try again.",
+            error: err  
+        })
+    }
 
     if(userExists) 
         return res.send({
@@ -190,47 +200,112 @@ app.post('/register', async (req, res) => {
             message: "User with email already exists"
         })
 
-    userExists = await UserSchema.findOne({username});
+    try {
+        userExists = await UserSchema.findOne({username});
+    }
+    catch(err) {
+        return res.send({
+            status: 400,
+            message: "Internal Server Error. Please try again.",
+            error: err  
+        })
+    }
 
     if(userExists) 
         return res.send({
             status: 400,
             message: "Username already taken"
         })
+
+    // Hash the password Plain text -> hash 
+    const hashedPassword = await bcrypt.hash(password, 13); // md5
     
     let user = new UserSchema({
         name,
         username,
-        password,
+        password: hashedPassword,
         email,
         phone
     })
 
-    const userDb = await user.save(); // Create Operation
-
-    res.send(userDb);
+    try {
+        const userDb = await user.save(); // Create Operation
+        return res.send({
+            status: 200,
+            message: "Registration Successful",
+            data: {
+                _id: userDb._id,
+                username: userDb.username,
+                email: userDb.email
+            }
+        });
+    }
+    catch(err) {
+        return res.send({
+            status: 400,
+            message: "Internal Server Error. Please try again.",
+            error: err  
+        })
+    }
 })
 
 app.post('/login', async (req, res) => {
 
-    const { username, password } = req.body;
+    // loginId can be either email or username
+    const { loginId, password } = req.body;
+
+    if(typeof(loginId) !== 'string' || typeof(password) !== 'string' || !loginId || !password) {
+        return res.send({
+            status: 400,
+            message: "Invalid Data"
+        })
+    }
 
     // find() - May return you multiple objects, Returns empty array if nothing matches, returns an array of objects 
     // findOne() - One object, Returns null if nothing matches, returns an object 
-
-    const userDb = await UserSchema.find({username});
+    let userDb;
+    try {
+        if(validator.isEmail(loginId)) {
+            userDb = await UserSchema.findOne({email: loginId}); 
+        }
+        else {
+            userDb = await UserSchema.findOne({username: loginId});
+        }
+    }
+    catch(err) {
+        console.log(err);
+        return res.send({
+            status: 400,
+            message: "Internal server error. Please try again",
+            error: err
+        })
+    }
+    
     console.log(userDb);
 
     if(!userDb) {
-        return res.send("User not found");
+        return res.send({
+            status: 400,
+            message: "User not found",
+            data: req.body
+        });
     }
 
-    if(userDb[0].password !== password) {
-        return res.send("Invalid Password");
+    // Comparing the password
+    const isMatch = await bcrypt.compare(password, userDb.password);
+
+    if(!isMatch) {
+        return res.send({
+            status: 400,
+            message: "Invalid Password",
+            data: req.body
+        });
     }
 
-    res.send("Logged in successfully");
-
+    res.send({
+        status: 200,
+        message: "Logged in successfully"
+    });
 })
 
 app.listen(3000, () => {
