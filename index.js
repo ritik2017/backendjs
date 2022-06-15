@@ -2,16 +2,34 @@ const express = require('express');
 const mongoose = require('mongoose');
 const validator = require('validator');
 const bcrypt = require('bcrypt');
+const session = require('express-session');
+const mongoDBSession = require('connect-mongodb-session')(session);
 
 const UserSchema = require('./UserSchema');
 
 const app = express();
 
+// Template Literal/Strings
+const mongoURI = `mongodb+srv://myappuser:ritikkumar@cluster0.mjfcg.mongodb.net/backendjs?retryWrites=true&w=majority`;
+
+const store = new mongoDBSession({
+    uri: mongoURI,
+    collection: 'sessions'
+})
+
 // Middleware -> After request before api call 
 app.use(express.json());
 app.use(express.urlencoded({extended: true}));
+// Adds the session object in req 
+app.use(session({
+    secret: 'hello backendjs',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: true },
+    store: store
+}))
 
-mongoose.connect('mongodb://localhost:27017/backendjs', {
+mongoose.connect(mongoURI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 }).then(res => {
@@ -302,6 +320,9 @@ app.post('/login', async (req, res) => {
         });
     }
 
+    req.session.isAuth = true;
+    req.session.user = { username: userDb.username, email: userDb.email };
+
     res.send({
         status: 200,
         message: "Logged in successfully"
@@ -348,3 +369,12 @@ app.listen(3000, () => {
 // Node - runtime environment 
 
 // Status Codes - 200 - Successful, 400 - Failed
+
+// Security 
+// Database access - Create a user. Note: Your password should not have @ symbol
+// Network access - Add IP - 0.0.0.0/0 
+// a. If you want only your machine to access the db replace 0.0.0.0 with your machine ip
+// b. To find your machine's ip:
+//   aa. Linux - ifconfig
+//   ab. Windows - ipconfig
+//   ac. Mac - System Preferences -> Network
