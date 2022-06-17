@@ -6,6 +6,7 @@ const session = require('express-session');
 const mongoDBSession = require('connect-mongodb-session')(session);
 
 const UserSchema = require('./UserSchema');
+const TodoSchema = require('./TodoSchema');
 
 const app = express();
 
@@ -20,12 +21,15 @@ const store = new mongoDBSession({
 // Middleware -> After request before api call 
 app.use(express.json());
 app.use(express.urlencoded({extended: true}));
+
+// EJS -> Template Rendering Engine 
+app.set('view engine', 'ejs');
+
 // Adds the session object in req 
 app.use(session({
     secret: 'hello backendjs',
     resave: false,
-    saveUninitialized: true,
-    cookie: { secure: true },
+    saveUninitialized: false,
     store: store
 }))
 
@@ -42,110 +46,14 @@ app.get('/', (req, res) => {
     res.send('Welcome to our app');
 })
 
-// app.get('/profile/:id/:name', (req, res) => {
-//     console.log(req.params.id, req.params.name);
-//     res.send('My name is Ritik');
-// })
+app.get('/login', (req, res) => {
+    console.log(res);
+    res.render('login');
+})
 
-// app.get('/order', (req, res) => {
-//     console.log(req.query);
-//     res.send('Order placed successfully');
-// })
-
-// app.get('/payment', (req, res) => {
-//     res.send('Payment received');
-// })
-
-// app.post('/payment', (req, res) => {
-//     res.send('Payment done successfully');
-// })
-
-// app.post('/order', (req, res) => {
-//     console.log(req.body);
-
-//     res.send('Ordered Successfully');
-// })
-
-// let users = [
-//     {
-//         userId: 1,
-//         name: "Karl"
-//     }
-// ]; 
-
-// let nextUserId = 2;
-
-// // Read API -> Reads data from the db
-// app.get('/users', (req, res) => {
-//     res.send(users);
-// })
-
-// // Create a new entry in the database
-// app.post('/users', (req, res) => {
-//     const name = req.body.name;
-//     const user = {
-//         userId: nextUserId,
-//         name: name
-//     }
-//     nextUserId++;
-
-//     users.push(user);
-
-//     res.send("User successfully registered");
-// })
-
-// // Update or modify a data
-// app.patch('/users', (req, res) => {
-
-//     const { name, userId } = req.body;
-
-//     users.map(user => {
-//         if(user.userId == userId) {
-//             user.name = name;
-//         }
-//         return user;
-//     })
-
-//     res.send("Update done successfully");
-// })
-
-// // Updates if the obj is present otherwise it adds it to the db
-// app.put('/users', (req, res) => {
-
-//     const { name, userId } = req.body;
-//     let recordUpdated = false;
-
-//     users.map(user => {
-//         if(user.userId == userId) {
-//             recordUpdated = true;
-//             user.name = name;
-//         }
-//         return user;
-//     })
-
-//     if(recordUpdated) {
-//         return res.send("User Updated Successfully");
-//     }
-
-//     let user = {
-//         userId: userId,
-//         name: name
-//     }
-
-//     users.push(user);
-
-//     res.send("User Added successfully");
-// })
-
-// // Deletes an obj from the db
-// app.delete('/users', (req, res) => {
-
-//     const { userId } = req.body;
-
-//     users = users.filter(user => user.userId !== userId);
-
-//     res.send("User Deleted Successfully");
-// })
+app.get('/register', (req, res) => {
+    res.render('register');
+})
 
 function cleanUpAndValidate({name, username, phone, email, password}) {
     return new Promise((resolve, reject) => {
@@ -321,7 +229,7 @@ app.post('/login', async (req, res) => {
     }
 
     req.session.isAuth = true;
-    req.session.user = { username: userDb.username, email: userDb.email };
+    req.session.user = { username: userDb.username, email: userDb.email, userId: userDb._id };
 
     res.send({
         status: 200,
@@ -329,10 +237,182 @@ app.post('/login', async (req, res) => {
     });
 })
 
+app.post('/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if(err) throw err;
+
+        res.send('Logged out successfully');
+    })
+})
+
+app.get('/dashboard', (req, res) => {
+    if(!req.session.isAuth) {
+        return res.send('You are not logged in. Please log in.');
+    }
+    res.render('dashboard');
+})
+
+// CRUD - Create, Read, Update, Delete
+app.post('/create-todo', async (req, res) => {
+
+    if(!req.session.isAuth) {
+        return res.send({
+            status: 400,
+            message: "You are not logged in. Please log in to create todos."
+        })
+    }
+    
+    const { todo } = req.body;
+
+    if(!todo) {
+        return res.send({
+            status: 400,
+            message: "Invalid Todo"
+        })
+    }
+
+    const userId = req.session.user.userId;
+    const creation_datetime = new Date();
+
+    const todoObj = new TodoSchema({
+        todo,
+        userId,
+        creation_datetime
+    });
+
+    try {
+        const todoDb = await todoObj.save();
+
+        return res.send({
+            status: 200,
+            message: "Todo created successfully",
+            data: todoDb
+        })
+    }
+    catch(err) {
+        return res.send({
+            status: 400,
+            message: 'Internal server error. Please try again.'
+        })
+    }
+})
+
+app.post('/edit-todo', (req, res) => {
+
+})
+
+app.post('/delete-todo', (req, res) => {
+
+})
+
 app.listen(3000, () => {
     console.log('Listening on port 3000');
 })
 
+// app.get('/profile/:id/:name', (req, res) => {
+//     console.log(req.params.id, req.params.name);
+//     res.send('My name is Ritik');
+// })
+
+// app.get('/order', (req, res) => {
+//     console.log(req.query);
+//     res.send('Order placed successfully');
+// })
+
+// app.get('/payment', (req, res) => {
+//     res.send('Payment received');
+// })
+
+// app.post('/payment', (req, res) => {
+//     res.send('Payment done successfully');
+// })
+
+// app.post('/order', (req, res) => {
+//     console.log(req.body);
+
+//     res.send('Ordered Successfully');
+// })
+
+// let users = [
+//     {
+//         userId: 1,
+//         name: "Karl"
+//     }
+// ]; 
+
+// let nextUserId = 2;
+
+// // Read API -> Reads data from the db
+// app.get('/users', (req, res) => {
+//     res.send(users);
+// })
+
+// // Create a new entry in the database
+// app.post('/users', (req, res) => {
+//     const name = req.body.name;
+//     const user = {
+//         userId: nextUserId,
+//         name: name
+//     }
+//     nextUserId++;
+
+//     users.push(user);
+
+//     res.send("User successfully registered");
+// })
+
+// // Update or modify a data
+// app.patch('/users', (req, res) => {
+
+//     const { name, userId } = req.body;
+
+//     users.map(user => {
+//         if(user.userId == userId) {
+//             user.name = name;
+//         }
+//         return user;
+//     })
+
+//     res.send("Update done successfully");
+// })
+
+// // Updates if the obj is present otherwise it adds it to the db
+// app.put('/users', (req, res) => {
+
+//     const { name, userId } = req.body;
+//     let recordUpdated = false;
+
+//     users.map(user => {
+//         if(user.userId == userId) {
+//             recordUpdated = true;
+//             user.name = name;
+//         }
+//         return user;
+//     })
+
+//     if(recordUpdated) {
+//         return res.send("User Updated Successfully");
+//     }
+
+//     let user = {
+//         userId: userId,
+//         name: name
+//     }
+
+//     users.push(user);
+
+//     res.send("User Added successfully");
+// })
+
+// // Deletes an obj from the db
+// app.delete('/users', (req, res) => {
+
+//     const { userId } = req.body;
+
+//     users = users.filter(user => user.userId !== userId);
+
+//     res.send("User Deleted Successfully");
+// })
 
 // npm init -> Initiazed the repository to run js
 // npm install express
@@ -378,3 +458,5 @@ app.listen(3000, () => {
 //   aa. Linux - ifconfig
 //   ab. Windows - ipconfig
 //   ac. Mac - System Preferences -> Network
+
+// hoisting in JS
