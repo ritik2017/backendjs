@@ -298,17 +298,112 @@ app.post('/create-todo', async (req, res) => {
     }
 })
 
-app.post('/edit-todo', (req, res) => {
+app.post('/read-todo', async (req, res) => {
 
+    if(!req.session.isAuth) {
+        return res.send({
+            status: 400,
+            message: "You are not logged in. Please log in to view todos."
+        })
+    }
+
+    const userId = req.session.user.userId;
+    let todos = [];
+
+    try {
+        todos = await TodoSchema.find({userId});
+    }
+    catch(err) {
+        return res.send({
+            status: 400,
+            message: "Internal server error. Please try again."
+        })
+    }
+    
+    return res.send({
+        status: 200,
+        message: "Read Successful",
+        data: todos
+    })
 })
 
-app.post('/delete-todo', (req, res) => {
+app.post('/edit-todo', async (req, res) => {
+    
+    if(!req.session.isAuth) {
+        return res.send({
+            status: 400,
+            message: "You are not logged in. Please log in."
+        })
+    }
 
+    const { todoId, todoText } = req.body;
+
+    try {
+        const todo = await TodoSchema.findOneAndUpdate({_id: todoId}, {todo: todoText});
+
+        return res.send({
+            status: 200,
+            message: "Update Successful",
+            data: todo
+        })
+    }
+    catch(err) {
+        return res.send({
+            status: 400,
+            message: "Internal server error. Please try again."
+        })
+    }
+})
+
+app.post('/delete-todo', async (req, res) => {
+    if(!req.session.isAuth) {
+        return res.send({
+            status: 400,
+            message: "You are not logged in. Please log in."
+        })
+    }
+
+    const { todoId } = req.body;
+
+    try {
+        const todo = await TodoSchema.findOneAndDelete({_id: todoId});
+
+        return res.send({
+            status: 200,
+            message: "Delete Successful",
+            data: todo
+        })
+    }
+    catch(err) {
+        return res.send({
+            status: 400,
+            message: "Internal server error. Please try again."
+        })
+    }
 })
 
 app.listen(3000, () => {
     console.log('Listening on port 3000');
 })
+
+// function hoisting() { // b
+
+//     // let a = 5;
+//     // var b = 100;
+//     // console.log(b);
+//     // if(a === 5) {
+//     //     let b = 10;
+//     //     console.log(b);
+//     // }
+//     // var b = 20;
+//     // console.log(b);
+
+//     // async 
+
+//     // Promise -> Takes time -> Pending, Resolved and Reject
+// }
+
+// hoisting();
 
 // app.get('/profile/:id/:name', (req, res) => {
 //     console.log(req.params.id, req.params.name);
