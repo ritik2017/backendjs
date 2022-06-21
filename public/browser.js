@@ -12,8 +12,10 @@ document.addEventListener('click', function(event) {
 
         const todoText = document.getElementById('create_field');
 
-        if(todoText.value === "")
+        if(todoText.value === "") {
+            alert('Please enter todo text');
             return;
+        }
 
         axios.post('/create-todo', JSON.stringify({
             todo: todoText.value
@@ -56,12 +58,14 @@ document.addEventListener('click', function(event) {
 
 window.onload = function() {
     axios.post('/read-todo', JSON.stringify({}), config).then(res => {
+        console.log(res);
         if(res.status !== 200) {
             alert('Failed to read todos. Please try again.');
             return;
         }
 
         const todoList = res.data.data;
+        console.log(todoList);
         
         document.getElementById('item_list').insertAdjacentHTML('beforeend', todoList.map(item => {
             return `<li class="list-group-item list-group-item-action d-flex align-items-center justify-content-between">

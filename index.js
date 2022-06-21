@@ -48,7 +48,6 @@ app.get('/', (req, res) => {
 })
 
 app.get('/login', (req, res) => {
-    console.log(res);
     res.render('login');
 })
 
@@ -253,6 +252,7 @@ app.get('/dashboard', (req, res) => {
     res.render('dashboard');
 })
 
+// Host Agnostic 
 // CRUD - Create, Read, Update, Delete
 app.post('/create-todo', async (req, res) => {
 
