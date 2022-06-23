@@ -272,6 +272,13 @@ app.post('/create-todo', async (req, res) => {
         })
     }
 
+    if(todo.length > 200) {
+        return res.send({
+            status: 400,
+            message: "Todo text too long. Todo can be max 200 characters in length."
+        })
+    }
+
     const userId = req.session.user.userId;
     const creation_datetime = new Date();
 
@@ -337,6 +344,20 @@ app.post('/edit-todo', async (req, res) => {
     }
 
     const { todoId, todoText } = req.body;
+
+    if(!todoText) {
+        return res.send({
+            status: 400,
+            message: "Invalid Data"
+        })
+    }
+
+    if(todoText.length > 200) {
+        return res.send({
+            status: 400,
+            message: "Todo text too long. Todo can be max 200 characters in length."
+        })
+    }
 
     try {
         const todo = await TodoSchema.findOneAndUpdate({_id: todoId}, {todo: todoText});
