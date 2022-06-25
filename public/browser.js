@@ -4,6 +4,8 @@ const config = {
     }
 }
 
+let skip = 0;
+
 document.addEventListener('click', function(event) {
 
     if(event.target.classList.contains('add_item')) {
@@ -21,7 +23,11 @@ document.addEventListener('click', function(event) {
             todo: todoText.value
         }), config)
         .then(res => {
-            console.log(res);
+            if(res.data.status !== 200) {
+                alert(res.data.message);
+                return;
+            }
+            todoText.value = "";
         }).catch(err => {
             console.log(err);
         })
@@ -36,7 +42,13 @@ document.addEventListener('click', function(event) {
             todoId,
             todoText
         }), config).then(res => {
-            console.log(res);
+            
+            if(res.data.status !== 200) {
+                alert(res.data.message);
+                return;
+            } 
+            event.target.parentElement.parentElement.querySelector('.item-text').innerHTML = todoText;
+
         }).catch(err => {
             console.log(err);
         })
@@ -49,23 +61,41 @@ document.addEventListener('click', function(event) {
         axios.post('/delete-todo', JSON.stringify({
             todoId
         }), config).then(res => {
-            console.log(res);
+            
+            if(res.data.status !== 200) {
+                alert(res.data.message);
+                return;
+            }
+            event.target.parentElement.parentElement.remove();
+            skip -= 1;
+
         }).catch(err => {
             console.log(err);
         })
     }
+
+    if(event.target.getAttribute('id') === 'show_more') {
+        generateTodos();
+    }
 })
 
 window.onload = function() {
-    axios.post('/read-todo', JSON.stringify({}), config).then(res => {
-        console.log(res);
+    generateTodos();
+}
+
+function generateTodos() {
+    axios.post(`/read-todo?skip=${skip}`, JSON.stringify({}), config).then(res => {
         if(res.status !== 200) {
             alert('Failed to read todos. Please try again.');
             return;
         }
 
         const todoList = res.data.data;
-        console.log(todoList);
+
+        if(todoList.length === 0) {
+            alert('No more todos to show');
+            return;
+        }
         
         document.getElementById('item_list').insertAdjacentHTML('beforeend', todoList.map(item => {
             return `<li class="list-group-item list-group-item-action d-flex align-items-center justify-content-between">
@@ -76,6 +106,11 @@ window.onload = function() {
             </div>
         </li>`
         }).join(''))
+
+        // Refrain from updating with a hard coded value
+        // Reason: 1. Code will break incase limit changed in Backend 
+        // 2. Todolist may not always be of fixed length (Reading last todos)
+        skip += todoList.length;
 
     }).catch(err => {
         console.log(err);

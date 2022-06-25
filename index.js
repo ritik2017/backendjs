@@ -43,6 +43,19 @@ mongoose.connect(mongoURI, {
     console.log('Failed to connect', err);
 })
 
+// Middleware for AUTH
+function checkAuth(req, res, next) {
+    if(req.session.isAuth) {
+        next();
+    }
+    else {
+        return res.send({
+            status: 400,
+            message: "You are not logged in. Please try logging in."
+        })
+    }
+}
+
 app.get('/', (req, res) => {
     res.send('Welcome to our app');
 })
@@ -245,23 +258,13 @@ app.post('/logout', (req, res) => {
     })
 })
 
-app.get('/dashboard', (req, res) => {
-    if(!req.session.isAuth) {
-        return res.send('You are not logged in. Please log in.');
-    }
+app.get('/dashboard', checkAuth, (req, res) => {
     res.render('dashboard');
 })
 
 // Host Agnostic 
 // CRUD - Create, Read, Update, Delete
-app.post('/create-todo', async (req, res) => {
-
-    if(!req.session.isAuth) {
-        return res.send({
-            status: 400,
-            message: "You are not logged in. Please log in to create todos."
-        })
-    }
+app.post('/create-todo', checkAuth, async (req, res) => {
     
     const { todo } = req.body;
 
@@ -281,6 +284,17 @@ app.post('/create-todo', async (req, res) => {
 
     const userId = req.session.user.userId;
     const creation_datetime = new Date();
+
+    // const ydatetime = new Date(Date.now() - (24*60*60*1000));
+    // const todoCount = await TodoSchema.count({userId: userId, creation_datetime: {$gt: ydatetime}});
+    const todoCount = await TodoSchema.count({userId: userId});
+    
+    if(todoCount >= 1000) {
+        return res.send({
+            status: 400,
+            message: "You have already created 1000 todos. Please try creating after deleting your old todos"
+        })
+    }
 
     const todoObj = new TodoSchema({
         todo,
@@ -305,22 +319,31 @@ app.post('/create-todo', async (req, res) => {
     }
 })
 
-app.post('/read-todo', async (req, res) => {
-
-    if(!req.session.isAuth) {
-        return res.send({
-            status: 400,
-            message: "You are not logged in. Please log in to view todos."
-        })
-    }
+app.post('/read-todo', checkAuth, async (req, res) => {
 
     const userId = req.session.user.userId;
+    // Limit is number of todos in each API call
+    const LIMIT = 4;
+    // Skip is the number of todos we wish to skip
+    const skip = req.query.skip || 0;
+
     let todos = [];
 
+    // Aggregate - Doing mutiple database operation simultaneously 
+    // Select * from todos where userId="" LIMIT 5 OFFSET ${skip}
+
     try {
-        todos = await TodoSchema.find({userId});
+        // const todos = await TodoSchema.find({userId});
+        todos = await TodoSchema.aggregate([
+            {$match: { userId: userId.toString() }},
+            {$facet: {
+                data: [{$skip: parseInt(skip)}, {$limit: LIMIT}]
+            }}
+        ])
+        console.log(todos);
     }
     catch(err) {
+        console.log(err);
         return res.send({
             status: 400,
             message: "Internal server error. Please try again."
@@ -330,18 +353,11 @@ app.post('/read-todo', async (req, res) => {
     return res.send({
         status: 200,
         message: "Read Successful",
-        data: todos
+        data: todos[0].data
     })
 })
 
-app.post('/edit-todo', async (req, res) => {
-    
-    if(!req.session.isAuth) {
-        return res.send({
-            status: 400,
-            message: "You are not logged in. Please log in."
-        })
-    }
+app.post('/edit-todo', checkAuth, async (req, res) => {
 
     const { todoId, todoText } = req.body;
 
@@ -376,13 +392,7 @@ app.post('/edit-todo', async (req, res) => {
     }
 })
 
-app.post('/delete-todo', async (req, res) => {
-    if(!req.session.isAuth) {
-        return res.send({
-            status: 400,
-            message: "You are not logged in. Please log in."
-        })
-    }
+app.post('/delete-todo', checkAuth, async (req, res) => {
 
     const { todoId } = req.body;
 
@@ -577,3 +587,14 @@ app.listen(3000, () => {
 //   ac. Mac - System Preferences -> Network
 
 // hoisting in JS
+
+// Create, Edit - Data Overflow 
+    // Sol: Max Size, Max todos per day
+// Read API - Starvation
+    // Pagination
+
+// Regression -> Changing something in one part of code resulting in breaking a different part of code
+
+// Middleware -> After receiving the req and before executing the API
+// app.use -> Middleware for all the api
+// Middlewares for specific api
